@@ -2,6 +2,9 @@
 #include <iostream>
 #include "gpu-new-forward.h"
 
+
+// __constant__ filter_mask;
+
 __global__ void conv_forward_kernel(float *output, const float *input, const float *mask, const int Batch, const int Map_out, const int Channel, const int Height, const int Width, const int K)
 {
     /*
@@ -23,8 +26,8 @@ __global__ void conv_forward_kernel(float *output, const float *input, const flo
 
     const int Height_out = Height - K + 1;
     const int Width_out = Width - K + 1;
-    (void)Height_out; // silence declared but never referenced warning. remove this line when you start working
-    (void)Width_out; // silence declared but never referenced warning. remove this line when you start working
+    // (void)Height_out; // silence declared but never referenced warning. remove this line when you start working
+    // (void)Width_out; // silence declared but never referenced warning. remove this line when you start working
 
     // We have some nice #defs for you below to simplify indexing. Feel free to use them, or create your own.
     // An example use of these macros:
@@ -58,6 +61,14 @@ __host__ void GPUInterface::conv_forward_gpu_prolog(const float *host_output, co
     //     std::cout<<"CUDA error: "<<cudaGetErrorString(error)<<std::endl;
     //     exit(-1);
     // }
+    int H_out = Height - K + 1;
+    int W_out = Width - K + 1;
+    cudaMalloc(void(**)device_input_ptr, Batch * Channel * Height * Width * sizeof(float)); // batch number * height * width * channel
+    cudaMalloc(void(**)device_output_ptr, Batch * Map_out * H_out* W_out * sizeof(float)); // batch number * height * width
+    cudaMalloc(void(**)device_mask_ptr, Channel * Map_out * K * K * sizeof(float)); // batch number * height * width
+    cudaMemcpy(*device_input_ptr, host_input, Batch * Channel * Height * Width * sizeof(float), cudaMemcpyHostToDevice); // copy host input to device input    
+    cudaMemcpy(*device_mask_ptr, host_mask, Channel * Map_out * K * K * sizeof(float), cudaMemcpyHostToDevice);
+    // do we use constant memory here ?
 
 }
 
@@ -72,9 +83,14 @@ __host__ void GPUInterface::conv_forward_gpu(float *device_output, const float *
 __host__ void GPUInterface::conv_forward_gpu_epilog(float *host_output, float *device_output, float *device_input, float *device_mask, const int Batch, const int Map_out, const int Channel, const int Height, const int Width, const int K)
 {
     // Copy the output back to host
-
+    int H_out = Height - K + 1;
+    int W_out = Width - K + 1;
+    cudaMemcpy(host_output, device_output, H_out * W_out * Batch * Map_out * sizeof(float), cudaMemcpyDeviceToHost);
+    
     // Free device memory
-
+    cudaFree(device_input);
+    cudaFree(device_output);
+    cudaFree(device_mask);
 }
 
 
