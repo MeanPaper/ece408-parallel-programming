@@ -3,7 +3,8 @@
 #include "gpu-new-forward.h"
 
 #define TILE_WIDTH 16
-__constant__ float kernel_mask[1 * 7 * 7 * 4 * 16 ];
+#define STREAM_NUM  4
+__constant__ float kernel_mask[1 * 7 * 7 * 4 * 16];
 
 __global__ void conv_forward_kernel(float *output, const float *input, const float *mask, const int Batch, 
     const int Map_out, const int Channel, const int Height, const int Width, const int K)
@@ -79,33 +80,80 @@ __host__ void GPUInterface::conv_forward_gpu_prolog(const float *host_output, co
     int W_out = Width - K + 1;  // compute the input width
     cudaMalloc((void**)device_output_ptr, Batch * Map_out * H_out * W_out * sizeof(float));   // using the output height and width
     cudaMalloc((void**)device_input_ptr, Batch * Channel * Height * Width * sizeof(float));   // using the input height and width       
-    // cudaMalloc((void**)device_mask_ptr, Map_out * Channel * K * K * sizeof(float));
     cudaMemcpy(*device_input_ptr, host_input, Batch * Channel * Height * Width * sizeof(float), cudaMemcpyHostToDevice); // copy host input to device input    
-    cudaMemcpyToSymbol(kernel_mask, host_mask, 1 * 7 * 7 * 4 * 16 *sizeof(float)); // copy to the constant memory
+    cudaMemcpyToSymbol(kernel_mask, host_mask, 1 * 7 * 7 * 4 * 16*sizeof(float)); // copy to the constant memory
 
+
+    // defined the grids required for the output
+    int H_grid = ceil((H_out*1.0)/TILE_WIDTH);  // height grids 
+    int W_grid = ceil((W_out*1.0)/TILE_WIDTH);  // width grids
+    int Z = H_grid * W_grid;                    // h x w requirements for the image
+    const int segSize = 25; // define seg size
+    
+    cudaStream_t streams[STREAM_NUM];
+    for(int i = 0; i < STREAM_NUM; ++i){    // create streams
+        cudaStreamCreate(&streams[i]);
+    } 
+    
+    int input_CHW = Channel * Height * Width;
+    int output_MHW = Map_out * H_out * W_out;
+    int in_copy_size = segSize * input_CHW;
+    int out_copy_size = segSize * output_MHW;
+    
+    dim3 DimBlocks(TILE_WIDTH,TILE_WIDTH, 1); // the un-optimized one
+    dim3 DimGrids(segSize, Map_out, Z);              // grid dimension
+
+    for (int i = 0; i < Batch; i += (STREAM_NUM * segSize)){
+
+        // input offsets
+        int offset0 = (i + 0 * segSize) * input_CHW;
+        int offset1 = (i + 1 * segSize) * input_CHW;
+        int offset2 = (i + 2 * segSize) * input_CHW;
+        int offset3 = (i + 3 * segSize) * input_CHW;
+
+        // output offset
+        int out_offset0 = (i + 0 * segSize) * output_MHW;
+        int out_offset1 = (i + 1 * segSize) * output_MHW;
+        int out_offset2 = (i + 2 * segSize) * output_MHW;
+        int out_offset3 = (i + 3 * segSize) * output_MHW;
+
+        // async cpy input, host to device
+        cudaMemcpyAsync(*device_input_ptr + offset0, host_input + offset0, in_copy_size * sizeof(float), cudaMemcpyHostToDevice, streams[0]);
+        cudaMemcpyAsync(*device_input_ptr + offset1, host_input + offset1, in_copy_size * sizeof(float), cudaMemcpyHostToDevice, streams[1]);
+        cudaMemcpyAsync(*device_input_ptr + offset2, host_input + offset2, in_copy_size * sizeof(float), cudaMemcpyHostToDevice, streams[2]);
+        cudaMemcpyAsync(*device_input_ptr + offset3, host_input + offset3, in_copy_size * sizeof(float), cudaMemcpyHostToDevice, streams[3]);
+
+        // stream kernel calls
+        conv_forward_kernel<<<DimGrids, DimBlocks, 0, streams[0]>>>(*device_output_ptr + out_offset0, *device_input_ptr + offset0, *device_mask_ptr, Batch, Map_out, Channel, Height, Width, K);
+        conv_forward_kernel<<<DimGrids, DimBlocks, 0, streams[1]>>>(*device_output_ptr + out_offset1, *device_input_ptr + offset1, *device_mask_ptr, Batch, Map_out, Channel, Height, Width, K);
+        conv_forward_kernel<<<DimGrids, DimBlocks, 0, streams[2]>>>(*device_output_ptr + out_offset2, *device_input_ptr + offset2, *device_mask_ptr, Batch, Map_out, Channel, Height, Width, K);
+        conv_forward_kernel<<<DimGrids, DimBlocks, 0, streams[3]>>>(*device_output_ptr + out_offset3, *device_input_ptr + offset3, *device_mask_ptr, Batch, Map_out, Channel, Height, Width, K);
+
+        // async cpy output, device to host
+        cudaMemcpyAsync((void*)(host_output + out_offset0), *device_output_ptr + out_offset0, out_copy_size * sizeof(float), cudaMemcpyDeviceToHost, streams[0]);
+        cudaMemcpyAsync((void*)(host_output + out_offset1), *device_output_ptr + out_offset1, out_copy_size * sizeof(float), cudaMemcpyDeviceToHost, streams[1]);
+        cudaMemcpyAsync((void*)(host_output + out_offset2), *device_output_ptr + out_offset2, out_copy_size * sizeof(float), cudaMemcpyDeviceToHost, streams[2]);
+        cudaMemcpyAsync((void*)(host_output + out_offset3), *device_output_ptr + out_offset3, out_copy_size * sizeof(float), cudaMemcpyDeviceToHost, streams[3]);
+    }
+
+    cudaFree(*device_input_ptr);
+    cudaFree(*device_output_ptr);
 }
 
 
 __host__ void GPUInterface::conv_forward_gpu(float *device_output, const float *device_input, const float *device_mask, const int Batch, const int Map_out, const int Channel, const int Height, const int Width, const int K)
 {
     // Set the kernel dimensions and call the kernel
-
-
-    // need to understand the concept of this kernel, like how to set up the kernel
-    // find out the height of the output
-    int H_out = Height - K + 1;
-    int W_out = Width - K + 1;
+    // int H_out = Height - K + 1;
+    // int W_out = Width - K + 1;
     
-    // defined the grids required for the output
-    int H_grid = ceil((H_out*1.0)/TILE_WIDTH); // height grids 
-    int W_grid = ceil((W_out*1.0)/TILE_WIDTH); // width grids
-    int Z = H_grid * W_grid;                 // h x w requirements
+    // // defined the grids required for the output
+    // int H_grid = ceil((H_out*1.0)/TILE_WIDTH);  // height grids 
+    // int W_grid = ceil((W_out*1.0)/TILE_WIDTH);  // width grids
+    // int Z = H_grid * W_grid;                    // h x w requirements for the image
 
-    dim3 DimBlocks(TILE_WIDTH,TILE_WIDTH, 1); // block dimension
-    dim3 DimGrids(Batch, Map_out, Z);         // grid dimension
 
-    // (float *output, const float *input, const float *mask, const int Batch, const int Map_out, const int Channel, const int Height, const int Width, const int K)
-    conv_forward_kernel<<<DimGrids, DimBlocks>>>(device_output, device_input, NULL, Batch, Map_out, Channel, Height, Width, K);
+    return;
     // cudaDeviceSynchronize();
 
 }
@@ -114,16 +162,11 @@ __host__ void GPUInterface::conv_forward_gpu(float *device_output, const float *
 __host__ void GPUInterface::conv_forward_gpu_epilog(float *host_output, float *device_output, float *device_input, float *device_mask, const int Batch, const int Map_out, const int Channel, const int Height, const int Width, const int K)
 {
     // Copy the output back to host
-    int H_out = Height - K + 1;
-    int W_out = Width - K + 1;
-    cudaMemcpy(host_output, device_output, H_out * W_out * Batch * Map_out * sizeof(float), cudaMemcpyDeviceToHost);
-    
+    // int H_out = Height - K + 1;
+    // int W_out = Width - K + 1;    
     // Free device memory
-    cudaFree(device_input);
-    cudaFree(device_output);
-    // cudaFree(device_mask);
+    return;
 }
-
 
 __host__ void GPUInterface::get_device_properties()
 {

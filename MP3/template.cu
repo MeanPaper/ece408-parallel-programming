@@ -30,7 +30,7 @@ __global__ void matrixMultiply(float *A, float *B, float *C, int numARows,
   for(int i = 0; i < (numAColumns-1)+1/TILE_WIDTH; ++i){
     // loading the data into the matrix
     if(row < numARows && i*TILE_WIDTH + threadx < numAColumns)
-      tileA[thready][threadx] = A[row*numAColumns + i*TILE_WIDTH + threadx];
+      tileA[thready][threadx] = A[row*numAColumns + i*TILE_WIDTH + threadx]; // 
     else{
       tileA[thready][threadx] = 0;
     }

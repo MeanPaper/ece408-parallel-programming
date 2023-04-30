@@ -1,0 +1,151 @@
+shared and const v2 sweet spot
+
+TILE_WIDTH 20
+
+Test batch size: 100
+Loading fashion-mnist data...Done
+Loading model...Done
+Conv-GPU==
+Layer Time: 11.6292 ms
+Op Time: 0.177963 ms
+Conv-GPU==
+Layer Time: 5.92897 ms
+Op Time: 0.531784 ms
+
+TILE_WIDTH 8
+
+Test batch size: 100
+Loading fashion-mnist data...Done
+Loading model...Done
+Conv-GPU==
+Layer Time: 8.74637 ms
+Op Time: 0.173241 ms
+Conv-GPU==
+Layer Time: 6.10632 ms
+Op Time: 0.563769 ms
+
+Test Accuracy: 0.86
+
+
+real    0m1.162s
+user    0m0.987s
+sys     0m0.160s
+
+TILE_WIDTH 12
+
+Test batch size: 100
+Loading fashion-mnist data...Done
+Loading model...Done
+Conv-GPU==
+Layer Time: 7.23011 ms
+Op Time: 0.199614 ms
+Conv-GPU==
+Layer Time: 6.05543 ms
+Op Time: 0.505314 ms
+
+Test Accuracy: 0.86
+
+
+
+TILE_WIDTH 18
+
+Test batch size: 100
+Loading fashion-mnist data...Done
+Loading model...Done
+Conv-GPU==
+Layer Time: 8.00991 ms
+Op Time: 0.214374 ms
+Conv-GPU==
+Layer Time: 6.2915 ms
+Op Time: 0.474354 ms
+
+Test Accuracy: 0.86
+
+
+real    0m1.250s
+user    0m1.040s
+sys     0m0.183s
+
+
+
+===============================================================
+shared const v1
+
+TILE_WIDTH 12
+
+Test batch size: 100
+Loading fashion-mnist data...Done
+Loading model...Done
+Conv-GPU==
+Layer Time: 11.0383 ms
+Op Time: 0.283599 ms
+Conv-GPU==
+Layer Time: 6.18826 ms
+Op Time: 0.660081 ms
+
+Test Accuracy: 0.86
+
+
+real    0m1.258s
+user    0m1.057s
+sys     0m0.177s
+
+
+TILE_WIDTH 10
+
+Test batch size: 100
+Loading fashion-mnist data...Done
+Loading model...Done
+Conv-GPU==
+Layer Time: 7.42288 ms
+Op Time: 0.261752 ms
+Conv-GPU==
+Layer Time: 6.15641 ms
+Op Time: 0.827982 ms
+
+Test Accuracy: 0.86
+
+
+real    0m1.217s
+user    0m0.997s
+sys     0m0.182s
+
+
+TILE_WIDTH 14
+
+Test batch size: 100
+Loading fashion-mnist data...Done
+Loading model...Done
+Conv-GPU==
+Layer Time: 11.9221 ms
+Op Time: 0.269646 ms
+Conv-GPU==
+Layer Time: 6.41231 ms
+Op Time: 0.829606 ms
+
+Test Accuracy: 0.86
+
+
+real    0m1.229s
+user    0m0.968s
+sys     0m0.202s
+
+
+TILE_WIDTH 18
+
+Test batch size: 100
+Loading fashion-mnist data...Done
+Loading model...Done
+Conv-GPU==
+Layer Time: 12.8314 ms
+Op Time: 0.280205 ms
+Conv-GPU==
+Layer Time: 7.42914 ms
+Op Time: 0.5758 ms
+
+Test Accuracy: 0.86
+
+
+real    0m1.224s
+user    0m0.991s
+sys     0m0.185s

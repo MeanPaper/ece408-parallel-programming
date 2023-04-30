@@ -1,5 +1,6 @@
 #include <cmath>
 #include <iostream>
+#include <cuda_fp16.h>
 #include "gpu-new-forward.h"
 
 #define TILE_WIDTH 16
@@ -43,16 +44,16 @@ __global__ void conv_forward_kernel(float *output, const float *input, const flo
     m = blockIdx.y;
     h = (blockIdx.z / W_grid) * TILE_WIDTH + threadIdx.y;
     w = (blockIdx.z % W_grid) * TILE_WIDTH + threadIdx.x;
-    float acc = 0;
+    __half acc = __float2half_rn(0.0f);
     if(h < Height_out && w < Width_out){
         for(c = 0; c < Channel; ++c){
             for(int p = 0; p < K; ++p){     // for loop, the mask K x K
                 for(int q = 0; q < K; ++q){
-                    acc += in_4d(n, c, h+p, w+q) * mask_4d(m,c,p,q);
+                    acc = __hadd(acc, __hmul(__float2half_rn(in_4d(n, c, h+p, w+q)), __float2half_rn(mask_4d(m,c,p,q))));                    // acc += in_4d(n, c, h+p, w+q) * mask_4d(m,c,p,q);
                 }
             }
         }
-        out_4d(n,m,h,w) = acc;
+        out_4d(n,m,h,w) = __half2float(acc);
     }
     
     #undef out_4d

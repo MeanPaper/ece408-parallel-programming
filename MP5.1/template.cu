@@ -5,7 +5,7 @@
 #include <wb.h>
 
 // the original one is 512
-#define BLOCK_SIZE 128 //@@ You can change this
+#define BLOCK_SIZE 512 //@@ You can change this
 
 #define wbCheck(stmt)                                                     \
   do {                                                                    \
@@ -27,7 +27,7 @@ __global__ void total(float *input, float *output, int len) {
   int tx = threadIdx.x;
   int bdim = blockDim.x;
   int start = bx * bdim * 2;
-  if(start < len){
+  if(start + tx < len){
     tileMem[tx] = input[start+tx]; 
   }
   else{
@@ -40,14 +40,14 @@ __global__ void total(float *input, float *output, int len) {
     tileMem[tx + bdim] = 0.0;
   }
   
-  for(int stride = bdim; stride >= 1; stride /= 2){
+  for(int stride = bdim; stride > 1; stride /= 2){
     __syncthreads();
     if(tx < stride){
       tileMem[tx] += tileMem[tx+stride];
     }
   }
   if(tx == 0){  // have control divergence 
-    output[bx] = tileMem[tx];
+    output[bx] = tileMem[tx] + tileMem[tx+1];
   }
   // this one does not have control divergence; however, it might have a lot of loading overhead
   // output[bx] = tileMen[0]; 

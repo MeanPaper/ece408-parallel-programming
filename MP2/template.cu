@@ -22,9 +22,10 @@ __global__ void matrixMultiply(float *A, float *B, float *C, int numARows,
   float partial = 0;
   if(row < numCRows && col < numCColumns){  // do the computation only when the data is within the range
 
-    for(int k = 0; k < numAColumns; ++k){
-
+    // think about matrix multiplication, what how many pair of elements we need to get
+    for(int k = 0; k < numAColumns; ++k){ // this has to be the cols of M, or the rows of N
       partial += A[row * numAColumns + k] * B[k * numBColumns + col];
+      // this is more or less relate to how you use the row major order formula
     }
     C[row*numCColumns + col] = partial;
   }
